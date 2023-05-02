@@ -1,20 +1,23 @@
-from dotenv import dotenv_values
-import sqlite3
+import dotenv, os, threading, time
 
-conn = sqlite3.connect("./data/data.db")
-cursor = conn.cursor()
+dotenv_file = dotenv.find_dotenv()
+dotenv.load_dotenv(dotenv_file)
 
-global __env
-__env = dotenv_values(".env")
-token = __env.get("SECRET_TOKEN")
+token = os.environ["SECRET_TOKEN"]
+offset = int(os.environ["LAST_UPDATE"])
 
-from telegram import bot
+from telegram_handler import bot, handler
 
 mybot = bot(token)
 
-print(mybot.link())
+print(mybot.getMe().content)
 
-sqlite_select_Query = "select sqlite_version();"
-cursor.execute(sqlite_select_Query)
-record = cursor.fetchall()
-print("SQLite Database Version is: ", record)
+myhandler = handler(mybot)
+
+threading.Thread(target=myhandler.listen).start()
+
+time.sleep(10)
+
+myhandler.stop()
+
+#dotenv.set_key(dotenv_file, "LAST_UPDATE", os.environ["LAST_UPDATE"])

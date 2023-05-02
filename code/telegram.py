@@ -1,3 +1,4 @@
+import requests
 class bot:
     def __init__(self, token):
         self.token = token
@@ -6,3 +7,12 @@ class bot:
 
     def link(self) -> str:
         return self.__link
+    
+    def getMe(self):
+        return requests.get(f"{self.__link}/getMe")
+    
+    def getUpdates(self, offset):
+        offset = (0,offset)[offset>0]
+        print(offset)
+        return requests.get(f"{self.__link}/getUpdates?offset={offset}")
+        
