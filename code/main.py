@@ -1,15 +1,21 @@
-import dotenv, os, threading
+import dotenv, os, threading, time
 
 def start_terminal(pipe_path):
     import sys
     from subprocess import Popen, PIPE
 
-    target = 'server_console.py'
+    print("starting terminal")
+
+    os.environ['TERM'] = 'xterm-256color'
+
+    target = f'{os.getcwd()}/code/server_console.py'
 
     new_window_command = "cmd.exe /c start".split()
 
     py = [sys.executable]
-    Popen(new_window_command + py + [target, pipe_path])
+    proc = Popen(new_window_command + py + [target, pipe_path])
+    print(new_window_command + py + [target, pipe_path])
+    proc.wait()
     pass
 
 dotenv_file = dotenv.find_dotenv()
@@ -29,6 +35,8 @@ start_terminal(pipe_path)
 myhandler = handler(mybot, pipe_path)
 
 threading.Thread(target=myhandler.listen).start()
+
+time.sleep(3)
 
 inp = ""
 while inp != "exit":

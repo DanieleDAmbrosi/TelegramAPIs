@@ -3,7 +3,8 @@ import json
 import os
 from subprocess import Popen, PIPE
 import time
-
+import dotenv, os, threading
+import win32pipe, win32file, pywintypes, time
 
 class handler:
 
@@ -23,14 +24,47 @@ class handler:
 
     def listen(self):
         self.__isListening = True
-        while self.__isListening:
-            updates = self.__target.getUpdates(self.__offset).content.decode()
-            updates = json.loads(updates)
-            if(bool(updates["ok"])):
-                print(updates["result"])    
-            pass
+
+        pipe = self.__create_pipe()
+
+        try:
+            while self.__isListening:
+                updates = self.__target.getUpdates(self.__offset).content.decode()
+                updates = json.loads(updates)
+                if(bool(updates["ok"])):
+                    self.__print_pipe(pipe, json.dumps(updates["result"]))
+                    time.sleep(2)
+                pass
+        finally:
+            self.__close_pipe(pipe)
+            self.__isListening = False
         pass
 
     def stop(self): self.__isListening = False
 
     def last_update(self): return self.__offset
+
+    def __print_pipe(self, pipe, data):
+        data = bytes(str.encode(data))
+        try:
+            win32file.WriteFile(pipe, data)
+        except:
+            self.__close_pipe(pipe)
+        pass
+
+    def __create_pipe(self):
+        pipe = win32pipe.CreateNamedPipe(
+        self.__pipe_path,
+        win32pipe.PIPE_ACCESS_DUPLEX,
+        win32pipe.PIPE_TYPE_MESSAGE | win32pipe.PIPE_READMODE_MESSAGE | win32pipe.PIPE_WAIT,
+        1, 65536, 65536,
+        0,
+        None)
+        print("waiting for client")
+        win32pipe.ConnectNamedPipe(pipe, None)
+        print("got client")
+        return pipe
+    
+    def __close_pipe(self, pipe):
+         win32file.CloseHandle(pipe)
+         pass

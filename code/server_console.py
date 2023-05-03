@@ -30,7 +30,6 @@ def start_pipe(pipe_path):
                     quit = True
 
 
-os.system('pause')
 if len(sys.argv) < 2:
     print("need the pipe path")
     os.system('pause')

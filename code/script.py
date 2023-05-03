@@ -4,7 +4,11 @@ def start_terminal(pipe_path):
     import sys
     from subprocess import Popen, PIPE
 
-    target = './server_console.py'
+    print("starting terminal")
+
+    os.environ['TERM'] = 'xterm-256color'
+
+    target = f'{os.getcwd()}/code/server_console.py'
 
     new_window_command = "cmd.exe /c start".split()
 
