@@ -32,7 +32,13 @@ print(mybot.getMe().content)
 
 pipe_path = os.environ["PIPE_PATH"]
 start_terminal(pipe_path)
-myhandler = handler(mybot, pipe_path)
+import database
+
+db=database.Database(os.environ["DB_PATH"] + "users.db")
+
+dbhandler = database.DatabaseHandler(db, "users")
+    
+myhandler = handler(mybot, pipe_path, dbhandler,  offset)
 
 threading.Thread(target=myhandler.listen).start()
 

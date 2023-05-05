@@ -5,6 +5,7 @@ from subprocess import Popen, PIPE
 import time
 import dotenv, os, threading
 import win32pipe, win32file, pywintypes, time
+import database
 
 class handler:
 
@@ -16,10 +17,13 @@ class handler:
 
     __pipe_path: str = ""
 
-    def __init__(self, target: bot, pipe_path: str, offset: int = 0) -> None:
+    __db_handler: database.DatabaseHandler = None
+
+    def __init__(self, target: bot, pipe_path: str, db_handler: database.DatabaseHandler, offset: int = 0) -> None:
         self.__target = target
         self.__offset = offset
         self.__pipe_path = pipe_path
+        self.__db_handler = db_handler
         pass
 
     def listen(self):
@@ -33,6 +37,10 @@ class handler:
                 updates = json.loads(updates)
                 if(bool(updates["ok"])):
                     self.__print_pipe(pipe, json.dumps(updates["result"]))
+                    for update in updates["result"]:
+                        if int(update["update_id"]) > self.__offset: self.__offset = int(update["update_id"])
+                        
+                        pass
                     time.sleep(2)
                 pass
         finally:
@@ -40,7 +48,9 @@ class handler:
             self.__isListening = False
         pass
 
-    def stop(self): self.__isListening = False
+    def stop(self):
+        self.__isListening = False
+        self.__db_handler.close()
 
     def last_update(self): return self.__offset
 

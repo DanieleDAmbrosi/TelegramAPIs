@@ -5,6 +5,12 @@
             "driver": "SQLite",
             "name": "Python_database",
             "database": "${workspaceFolder:telegramBOT}/data/data.db"
+        },
+        {
+            "previewLimit": 50,
+            "driver": "SQLite",
+            "name": "users",
+            "database": "${workspaceFolder:TelegramAPIs}/data/users.db"
         }
     ],
     "sqltools.useNodeRuntime": true

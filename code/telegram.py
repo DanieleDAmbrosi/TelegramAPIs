@@ -13,4 +13,4 @@ class bot:
     
     def getUpdates(self, offset):
         offset = (0,offset)[offset>0]
-        return requests.get(f"{self.__link}/getUpdates?offset={offset}")    
+        return requests.get(f"{self.__link}/getUpdates?offset={offset + 1}")    
