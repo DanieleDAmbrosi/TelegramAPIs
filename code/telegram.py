@@ -20,3 +20,6 @@ class bot:
 
     def getCommands(self, scope = {"type": "default"}, language_code = ""):
         return requests.get(f"{self.__link}/getMyCommands", json=json.dumps({"scope": scope, "language_code": language_code}))
+    
+    def sendMessage(self, chat_id, text):
+        return requests.post(f"{self.__link}/sendMessage", json=json.dumps({"chat_id": chat_id, "text": text}))

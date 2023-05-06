@@ -37,7 +37,7 @@ class bot_handler:
             while self.__isListening:
                 results = self.__get_results()
                 if len(results) > 0:
-                    threading.Thread(target=self.__handle_results, args=(results)).start()
+                    threading.Thread(target=self.__handle_results, args=results).start()
                 self.__print_pipe(pipe, json.dumps(results))
                 time.sleep(2)
         finally:
@@ -53,21 +53,16 @@ class bot_handler:
                 if int(update["update_id"]) > self.__offset: self.__offset = int(update["update_id"])
             return updates["result"]
         
-    def __handle_results(self, results):
-        for result in results:
-            message = result["message"]
-            id = message["chat"]["id"]
-            entities = message.get("entities")
-            if entities is None: pass #TO DO:
-            else:
-                if self.__chat_handlers.get(id) is None:
-
-                    pass
-                pass
-            pass
-        pass
-
-    def __handle_command(self, command):
+    def __handle_results(self, result):
+        message = result["message"]
+        id = message["chat"]["id"]
+        entities = message.get("entities")
+        commands = []
+        if entities is not None:
+            commands = [message["text"][entity["offset"]+1:entity["offset"]+entity["length"]] for entity in entities]
+        if id not in self.__chat_handlers.keys():
+            self.__chat_handlers[id] = chat_handler(id, self.__target)
+        self.__chat_handlers[id].handle(message, commands)
         pass
 
     def stop(self):
@@ -102,5 +97,14 @@ class bot_handler:
         pass
     
 class chat_handler():
-
+    __bot: bot = None
+    id: int = 0
+    def __init__(self, id: int, bot: bot) -> None:
+        self.id = id
+        self.__bot = bot
+        pass
     pass
+
+    def handle(self, message, commands):
+        response = self.__bot.sendMessage(chat_id=self.id, text=f"[+] USER: {self.id} Hai mandato il messaggio: {message.get('text')} I comandi sono: {commands}")
+        pass
