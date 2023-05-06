@@ -24,7 +24,7 @@ dotenv.load_dotenv(dotenv_file)
 token = os.environ["SECRET_TOKEN"]
 offset = int(os.environ["LAST_UPDATE"])
 
-from telegram_handler import bot, handler
+from telegram_handler import bot, bot_handler
 
 mybot = bot(token)
 
@@ -37,17 +37,17 @@ import database
 db=database.Database(os.environ["DB_PATH"] + "users.db")
 
 dbhandler = database.DatabaseHandler(db, "users")
-    
-myhandler = handler(mybot, pipe_path, dbhandler,  offset)
 
-threading.Thread(target=myhandler.listen).start()
+bothandler = bot_handler(mybot, pipe_path, dbhandler, offset)
+
+threading.Thread(target=bothandler.listen).start()
 
 time.sleep(3)
 
 inp = ""
 while inp != "exit":
-    inp = input("Type exit to quit...")
+    inp = input("Type exit to quit...\n")
 
-myhandler.stop()
+bothandler.stop()
 
-dotenv.set_key(dotenv_file, "LAST_UPDATE", str(myhandler.last_update()))
+dotenv.set_key(dotenv_file, "LAST_UPDATE", str(bothandler.last_update()))

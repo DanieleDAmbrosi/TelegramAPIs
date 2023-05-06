@@ -7,7 +7,7 @@ import dotenv, os, threading
 import win32pipe, win32file, pywintypes, time
 import database
 
-class handler:
+class bot_handler:
 
     __target: bot
 
@@ -18,6 +18,8 @@ class handler:
     __pipe_path: str = ""
 
     __db_handler: database.DatabaseHandler = None
+
+    __chat_handlers: dict = {}
 
     def __init__(self, target: bot, pipe_path: str, db_handler: database.DatabaseHandler, offset: int = 0) -> None:
         self.__target = target
@@ -33,19 +35,39 @@ class handler:
 
         try:
             while self.__isListening:
-                updates = self.__target.getUpdates(self.__offset).content.decode()
-                updates = json.loads(updates)
-                if(bool(updates["ok"])):
-                    self.__print_pipe(pipe, json.dumps(updates["result"]))
-                    for update in updates["result"]:
-                        if int(update["update_id"]) > self.__offset: self.__offset = int(update["update_id"])
-                        
-                        pass
-                    time.sleep(2)
-                pass
+                results = self.__get_results()
+                if len(results) > 0:
+                    threading.Thread(target=self.__handle_results, args=(results)).start()
+                self.__print_pipe(pipe, json.dumps(results))
+                time.sleep(2)
         finally:
             self.__close_pipe(pipe)
             self.__isListening = False
+        pass
+
+    def __get_results(self):
+        updates = self.__target.getUpdates(self.__offset).content.decode()
+        updates = json.loads(updates)
+        if(bool(updates["ok"])):
+            for update in updates["result"]:
+                if int(update["update_id"]) > self.__offset: self.__offset = int(update["update_id"])
+            return updates["result"]
+        
+    def __handle_results(self, results):
+        for result in results:
+            message = result["message"]
+            id = message["chat"]["id"]
+            entities = message.get("entities")
+            if entities is None: pass #TO DO:
+            else:
+                if self.__chat_handlers.get(id) is None:
+
+                    pass
+                pass
+            pass
+        pass
+
+    def __handle_command(self, command):
         pass
 
     def stop(self):
@@ -76,5 +98,9 @@ class handler:
         return pipe
     
     def __close_pipe(self, pipe):
-         win32file.CloseHandle(pipe)
-         pass
+        win32file.CloseHandle(pipe)
+        pass
+    
+class chat_handler():
+
+    pass
