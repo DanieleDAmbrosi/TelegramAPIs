@@ -37,7 +37,8 @@ class bot_handler:
             while self.__isListening:
                 results = self.__get_results()
                 if len(results) > 0:
-                    threading.Thread(target=self.__handle_results, args=results).start()
+                    for result in results:
+                        threading.Thread(target=self.__handle_result, args = [result]).start()
                 self.__print_pipe(pipe, json.dumps(results))
                 time.sleep(2)
         finally:
@@ -46,14 +47,12 @@ class bot_handler:
         pass
 
     def __get_results(self):
-        updates = self.__target.getUpdates(self.__offset).content.decode()
-        updates = json.loads(updates)
-        if(bool(updates["ok"])):
-            for update in updates["result"]:
-                if int(update["update_id"]) > self.__offset: self.__offset = int(update["update_id"])
-            return updates["result"]
+        updates = self.__target.getUpdates(self.__offset)
+        for update in updates:
+            if int(update["update_id"]) > self.__offset: self.__offset = int(update["update_id"])
+        return updates
         
-    def __handle_results(self, result):
+    def __handle_result(self, result):
         message = result["message"]
         id = message["chat"]["id"]
         entities = message.get("entities")
@@ -106,5 +105,6 @@ class chat_handler():
     pass
 
     def handle(self, message, commands):
-        response = self.__bot.sendMessage(chat_id=self.id, text=f"[+] USER: {self.id} Hai mandato il messaggio: {message.get('text')} I comandi sono: {commands}")
+        text = f"[+] USER: {self.id} \nHai mandato il messaggio: {message.get('text')} \nI comandi sono: {json.dumps(commands)}"
+        response = self.__bot.sendMessage(chat_id=self.id, text=text)
         pass

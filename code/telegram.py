@@ -13,7 +13,12 @@ class bot:
     
     def getUpdates(self, offset):
         offset = (0,offset)[offset>0]
-        return requests.get(f"{self.__link}/getUpdates?offset={offset + 1}")
+        updates = requests.get(f"{self.__link}/getUpdates?offset={offset + 1}").content.decode()
+        updates = json.loads(updates)
+        if(bool(updates["ok"])):
+            return updates["result"]
+        else:
+                return []
     
     def setCommands(self, commands):
         return requests.post(f"{self.__link}/setMyCommands", json=commands)
@@ -22,4 +27,4 @@ class bot:
         return requests.get(f"{self.__link}/getMyCommands", json=json.dumps({"scope": scope, "language_code": language_code}))
     
     def sendMessage(self, chat_id, text):
-        return requests.post(f"{self.__link}/sendMessage", json=json.dumps({"chat_id": chat_id, "text": text}))
+        return requests.post(f"{self.__link}/sendMessage", json={"chat_id": chat_id, "text": text})
