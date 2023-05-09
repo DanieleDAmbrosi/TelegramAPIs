@@ -112,7 +112,6 @@ class Update:
         self.__update_id = update_id
         if("from" in message.keys()):
             message["_from"] = message.pop("from")
-        print(self)
         self.__message = Message(**message)
         pass
 

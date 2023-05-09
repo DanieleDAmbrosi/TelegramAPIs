@@ -1,4 +1,4 @@
-from telegram import bot
+from telegram import *
 import json
 import os
 from subprocess import Popen, PIPE
@@ -30,20 +30,24 @@ class bot_handler:
 
     def listen(self):
         self.__isListening = True
-
         pipe = self.__create_pipe()
 
         try:
             while self.__isListening:
-                results = self.__get_results()
-                if len(results) > 0:
-                    for result in results:
-                        threading.Thread(target=self.__handle_result, args = [result]).start()
-                self.__print_pipe(pipe, json.dumps(results))
-                time.sleep(2)
+                updates: Update = self.__target.getUpdatesObject(self.__offset)
+                for update in updates:
+                    if update._Update__update_id > self.__offset: self.__offset = update._Update__update_id
+                    self.__print_pipe(pipe, repr(update))
+                    self.__handle_update(update)
+                    pass
         finally:
             self.__close_pipe(pipe)
-            self.__isListening = False
+            self.stop()
+        pass
+
+    def __handle_update(self, update):
+        message = update._Update__message
+        chat = message._Message__chat
         pass
 
     def __get_results(self):
@@ -60,18 +64,20 @@ class bot_handler:
         if entities is not None:
             commands = [message["text"][entity["offset"]+1:entity["offset"]+entity["length"]] for entity in entities]
         if id not in self.__chat_handlers.keys():
-            self.__chat_handlers[id] = chat_handler(id, self.__target)
+            #self.__chat_handlers[id] = chat_handler(id, self.__target)
+            pass
         self.__chat_handlers[id].handle(message, commands)
         pass
 
     def stop(self):
         self.__isListening = False
         self.__db_handler.close()
+        self.__close_pipe()
 
     def last_update(self): return self.__offset
 
     def __print_pipe(self, pipe, data):
-        data = bytes(str.encode(data))
+        data = bytes(str.encode(str(data)))
         try:
             win32file.WriteFile(pipe, data)
         except:
@@ -93,20 +99,4 @@ class bot_handler:
     
     def __close_pipe(self, pipe):
         win32file.CloseHandle(pipe)
-        pass
-    
-class chat_handler():
-    from enum import Enum
-    __bot: bot = None
-    id: int = 0
-    
-    def __init__(self, id: int, bot: bot) -> None:
-        self.id = id
-        self.__bot = bot
-        pass
-    pass
-
-    def handle(self, message, commands):
-        text = f"[+] USER: {self.id} \nHai mandato il messaggio: {message.get('text')} \nI comandi sono: {json.dumps(commands)}"
-        response = self.__bot.sendMessage(chat_id=self.id, text=text)
         pass
