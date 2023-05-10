@@ -35,7 +35,8 @@ start_terminal(pipe_path)
 
 db=database.Database(os.environ["DB_PATH"] + "users.db")
 
-dbhandler = database.DatabaseHandler(db, "users")
+#dbhandler = database.DatabaseHandler(db, "users")
+dbhandler = "REPLACE_THIS_LINE"
 
 bothandler = bot_handler(mybot, pipe_path, dbhandler, offset)
 

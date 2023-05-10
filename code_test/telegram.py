@@ -1,14 +1,14 @@
 import requests, json
 
 class Entity:
-    __offset: int = 0
-    __length: int = 0
-    __type: str = ""
+    _offset: int = 0
+    _length: int = 0
+    _type: str = ""
 
     def __init__(self, offset, length, type) -> None:
-        self.__offset = offset
-        self.__length = length
-        self.__type = type
+        self._offset = offset
+        self._length = length
+        self._type = type
         pass
 
     # @classmethod
@@ -21,20 +21,20 @@ class Entity:
     pass
 
 class User:
-    __id: int = 0
-    __is_bot: bool = False
-    __first_name: str = ""
-    __last_name: str = ""
-    __username: str = ""
-    __language_code: str = ""
+    _id: int = 0
+    _is_bot: bool = False
+    _first_name: str = ""
+    _last_name: str = ""
+    _username: str = ""
+    _language_code: str = ""
 
     def __init__(self, id, is_bot, first_name, last_name, username, language_code) -> None:
-        self.__id = id
-        self.__is_bot = is_bot
-        self.__first_name = first_name
-        self.__last_name = last_name
-        self.__username = username
-        self.__language_code = language_code
+        self._id = id
+        self._is_bot = is_bot
+        self._first_name = first_name
+        self._last_name = last_name
+        self._username = username
+        self._language_code = language_code
         pass
 
     # @classmethod
@@ -50,18 +50,18 @@ class User:
     pass
 
 class Chat:
-    __id: int = 0
-    __first_name: str = ""
-    __last_name: str = ""
-    __username: str = ""
-    __type: str = ""
+    _id: int = 0
+    _first_name: str = ""
+    _last_name: str = ""
+    _username: str = ""
+    _type: str = ""
 
     def __init__(self, id, first_name, last_name, username, type):
-        self.__id = id
-        self.__first_name = first_name
-        self.__last_name = last_name
-        self.__username = username
-        self.__type = type
+        self._id = id
+        self._first_name = first_name
+        self._last_name = last_name
+        self._username = username
+        self._type = type
         pass
 
     # @classmethod
@@ -76,20 +76,20 @@ class Chat:
     pass
 
 class Message:
-    __message_id: int = 0
-    __from: User
-    __chat: Chat
-    __text: str
-    __entities: list[Entity]
-    __date: int
+    _message_id: int = 0
+    _from: User
+    _chat: Chat
+    _text: str
+    _entities: list[Entity]
+    _date: int
 
     def __init__(self, message_id: int, _from: dict, chat: dict, text: str, date: int, entities: list[dict] = []) -> None:
-        self.__message_id = message_id
-        self.__from = User(**_from)
-        self.__chat = Chat(**chat)
-        self.__text = text
-        self.__entities = [Entity(**entity) for entity in entities]
-        self.__date = date
+        self._message_id = message_id
+        self._from = User(**_from)
+        self._chat = Chat(**chat)
+        self._text = text
+        self._entities = [Entity(**entity) for entity in entities]
+        self._date = date
         pass
 
     # @classmethod
@@ -105,14 +105,14 @@ class Message:
     pass    
 
 class Update:
-    __update_id: int = 0
-    __message: Message
+    _update_id: int = 0
+    _message: Message
 
     def __init__(self, update_id: int, message: dict) -> None:
-        self.__update_id = update_id
+        self._update_id = update_id
         if("from" in message.keys()):
             message["_from"] = message.pop("from")
-        self.__message = Message(**message)
+        self._message = Message(**message)
         pass
 
     # @classmethod

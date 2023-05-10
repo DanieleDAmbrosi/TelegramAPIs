@@ -36,7 +36,7 @@ class bot_handler:
             while self.__isListening:
                 updates: Update = self.__target.getUpdatesObject(self.__offset)
                 for update in updates:
-                    if update._Update__update_id > self.__offset: self.__offset = update._Update__update_id
+                    if update._update_id > self.__offset: self.__offset = update._update_id
                     self.__print_pipe(pipe, repr(update))
                     self.__handle_update(update)
                     pass
@@ -45,34 +45,17 @@ class bot_handler:
             self.stop()
         pass
 
-    def __handle_update(self, update):
-        message = update._Update__message
-        chat = message._Message__chat
-        pass
-
-    def __get_results(self):
-        updates = self.__target.getUpdates(self.__offset)
-        for update in updates:
-            if int(update["update_id"]) > self.__offset: self.__offset = int(update["update_id"])
-        return updates
-        
-    def __handle_result(self, result):
-        message = result["message"]
-        id = message["chat"]["id"]
-        entities = message.get("entities")
-        commands = []
-        if entities is not None:
-            commands = [message["text"][entity["offset"]+1:entity["offset"]+entity["length"]] for entity in entities]
-        if id not in self.__chat_handlers.keys():
-            #self.__chat_handlers[id] = chat_handler(id, self.__target)
-            pass
-        self.__chat_handlers[id].handle(message, commands)
+    def __handle_update(self, update: Update):
+        message: Message = update._message
+        chat: Chat = message._chat
+        if chat._id not in self.__chat_handlers:
+            self.__chat_handlers[chat._id] = chat_handler(chat._id)
+        self.__chat_handlers[chat._id].handle(message)
         pass
 
     def stop(self):
         self.__isListening = False
         self.__db_handler.close()
-        self.__close_pipe()
 
     def last_update(self): return self.__offset
 
@@ -100,3 +83,14 @@ class bot_handler:
     def __close_pipe(self, pipe):
         win32file.CloseHandle(pipe)
         pass
+
+class chat_handler:
+    _chat_id: int
+
+    def __init__(self, chat_id: int) -> None:
+        self._chat_id = chat_id
+        pass
+
+    def handle(message: Message):
+        pass
+    pass
