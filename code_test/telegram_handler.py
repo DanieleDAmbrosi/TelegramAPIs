@@ -14,28 +14,39 @@ class bot_handler:
 
     __offset: int = 0
 
-    __pipe_handler: pipe.pipe_handler
-
     __db_handler: database.DatabaseHandler = None
+
+    __out = print
+    __consume = lambda: None
+    __stop_consume = lambda: None
 
     __chat_handlers: dict = {}
 
     def __init__(self, target: bot, pipe_handler: pipe.pipe_handler = None, db_handler: database.DatabaseHandler = None, offset: int = 0) -> None:
         self.__target = target
         self.__offset = offset
-        self.__pipe_handler = pipe_handler
+
+        if pipe_handler:
+            self.__out = pipe_handler.push_message
+            self.__consume = pipe_handler.consume
+            self.__stop_consume = pipe_handler.stop #se il pipe handler non esiste scelgo come canale di out la print normale
+            
+        # self.__pipe_handler.stop = lambda : None
+        # self.__pipe_handler.consume = lambda : None
         self.__db_handler = db_handler
         pass
 
     def listen(self):
         self.__isListening = True
-        threading.Thread(target=self.__pipe_handler.consume).start()
+        #threading.Thread(target=self.__pipe_handler.consume).start()
+        threading.Thread(target=self.__consume).start()
         try:
             while self.__isListening:
                 updates: Update = self.__target.getUpdatesObject(self.__offset)
                 for update in updates:
                     if update._update_id > self.__offset: self.__offset = update._update_id
-                    self.__pipe_handler.push_message(repr(update))
+                    #self.__pipe_handler.push_message(repr(update))
+                    self.__out(repr(update))
                     self.__handle_update(update)
                     pass
         finally:
@@ -51,7 +62,7 @@ class bot_handler:
         pass
 
     def stop(self):
-        self.__pipe_handler.stop()
+        self.__stop_consume()
         self.__db_handler.close()
         self.__isListening = False
 

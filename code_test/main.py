@@ -38,6 +38,7 @@ db=database.Database(os.environ["DB_PATH"] + "users.db")
 dbhandler = database.DatabaseHandler(db, "users")
 
 from pipe import pipe_handler
+pipehandler = None
 pipehandler = pipe_handler(pipe_path)
 
 bothandler = bot_handler(mybot, pipehandler, dbhandler, offset)
