@@ -1,5 +1,24 @@
 import requests, json
 
+class Location:
+    _longitude: float = 0.0
+    _latitude: float = 0.0
+    _horizontal_accuracy: float = None
+    _live_period: int = None
+    _heading: int = None #1 - 360
+    _proximity_alert_radius: int = None
+
+    def __init__(self, longitude: float, latitude: float, horizontal_accuracy: float = None, live_period: int = None, heading: int = None, proximity_alert_radius: int = None) -> None:
+        self._longitude = longitude
+        self._latitude = latitude
+        self._horizontal_accuracy = horizontal_accuracy
+        self._live_period = live_period
+        self._heading = heading
+        self._proximity_alert_radius = proximity_alert_radius
+        pass
+
+    pass
+
 class Entity:
     _offset: int = 0
     _length: int = 0
@@ -82,14 +101,16 @@ class Message:
     _text: str
     _entities: list[Entity]
     _date: int
+    _location: Location
 
-    def __init__(self, message_id: int, _from: dict, chat: dict, text: str, date: int, entities: list[dict] = []) -> None:
+    def __init__(self, message_id: int, _from: dict, chat: dict, text: str, date: int, location: dict = None, entities: list[dict] = []) -> None:
         self._message_id = message_id
         self._from = User(**_from)
         self._chat = Chat(**chat)
         self._text = text
         self._entities = [Entity(**entity) for entity in entities]
         self._date = date
+        self._location = Location(**location) if location else None
         pass
 
     # @classmethod
@@ -125,7 +146,7 @@ class Update:
     #     return update
     pass
 
-class bot:
+class Bot:
     def __init__(self, token):
         self.token = token
         self.__link = f"https://api.telegram.org/bot{token}"

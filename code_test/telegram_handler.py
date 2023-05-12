@@ -1,3 +1,6 @@
+from .......users.danie.documents.github.telegramapis.code_test.telegram import Message
+from .......users.danie.documents.github.telegramapis.code_test.telegram import Message
+from .......users.danie.documents.github.telegramapis.code_test.telegram import Message
 from telegram import *
 import json
 import os
@@ -6,9 +9,9 @@ import time
 import dotenv, os, threading
 import database
 import pipe
-class bot_handler:
+class BotHandler:
 
-    __target: bot
+    __target: Bot
 
     __isListening: bool = False
 
@@ -22,7 +25,7 @@ class bot_handler:
 
     __chat_handlers: dict = {}
 
-    def __init__(self, target: bot, pipe_handler: pipe.pipe_handler = None, db_handler: database.DatabaseHandler = None, offset: int = 0) -> None:
+    def __init__(self, target: Bot, pipe_handler: pipe.PipeHandler = None, db_handler: database.DatabaseHandler = None, offset: int = 0) -> None:
         self.__target = target
         self.__offset = offset
 
@@ -57,7 +60,7 @@ class bot_handler:
         message: Message = update._message
         chat: Chat = message._chat
         if chat._id not in self.__chat_handlers:
-            self.__chat_handlers[chat._id] = chat_handler(chat._id)
+            self.__chat_handlers[chat._id] = ChatHandler(chat._id)
         self.__chat_handlers[chat._id].handle(message)
         pass
 
@@ -68,7 +71,7 @@ class bot_handler:
 
     def last_update(self): return self.__offset
 
-class chat_handler:
+class ChatHandler():
     _chat_id: int
 
     def __init__(self, chat_id: int) -> None:
@@ -76,5 +79,33 @@ class chat_handler:
         pass
 
     def handle(self, message: Message):
+        simple = self.simple_message(message)
         pass
     pass
+
+class Handler():
+    def handle(self, message: Message):
+        pass
+    pass
+
+class ConcreteHandler(Handler):
+    def handle(self, message: Message):
+        #do something with message
+        pass
+
+class Decorator(Handler):
+    def __init__(self, handler: Handler) -> None:
+        self._handler = handler
+        pass
+
+    def handler(self) -> Handler:
+        return self._handler
+    
+    def handle(self, message: Message):
+        return self._handler.handle()
+    pass
+
+class DecoratorBefore(Decorator):
+    def handle(self, message: Message):
+        #do something
+        return f"DecoratorBefore({self.handler.handle(message)})"

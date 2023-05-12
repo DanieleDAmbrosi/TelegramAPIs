@@ -1,5 +1,5 @@
 import dotenv, os, threading, time
-from telegram_handler import bot, bot_handler
+from telegram_handler import Bot, BotHandler
 import database
 
 def start_terminal(pipe_path):
@@ -26,7 +26,7 @@ dotenv.load_dotenv(dotenv_file)
 token = os.environ["SECRET_TOKEN"]
 offset = int(os.environ["LAST_UPDATE"])
 
-mybot = bot(token)
+mybot = Bot(token)
 
 print(mybot.getMe().content)
 
@@ -37,11 +37,11 @@ db=database.Database(os.environ["DB_PATH"] + "users.db")
 
 dbhandler = database.DatabaseHandler(db, "users")
 
-from pipe import pipe_handler
+from pipe import PipeHandler
 pipehandler = None
-pipehandler = pipe_handler(pipe_path)
+pipehandler = PipeHandler(pipe_path)
 
-bothandler = bot_handler(mybot, pipehandler, dbhandler, offset)
+bothandler = BotHandler(mybot, pipehandler, dbhandler, offset)
 
 threading.Thread(target=bothandler.listen).start()
 

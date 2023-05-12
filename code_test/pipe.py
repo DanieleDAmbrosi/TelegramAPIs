@@ -1,7 +1,7 @@
 import win32pipe, win32file, pywintypes, time
 from collections import deque
 
-class pipe_handler():
+class PipeHandler():
     __pipe = None
     __message_dequeue: deque[str] = deque()
     __running = False
