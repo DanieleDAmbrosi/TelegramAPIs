@@ -29,19 +29,17 @@ class bot_handler:
 
     def listen(self):
         self.__isListening = True
-        pipe = self.__create_pipe()
-
+        threading.Thread(target=self.__pipe_handler.consume).start()
         try:
             while self.__isListening:
                 updates: Update = self.__target.getUpdatesObject(self.__offset)
                 for update in updates:
                     if update._update_id > self.__offset: self.__offset = update._update_id
-                    self.__print_pipe(pipe, repr(update))
+                    self.__pipe_handler.push_message(repr(update))
                     self.__handle_update(update)
                     pass
         finally:
-            self.__close_pipe(pipe)
-            self.stop()
+            if self.__isListening: self.stop()
         pass
 
     def __handle_update(self, update: Update):
@@ -53,8 +51,9 @@ class bot_handler:
         pass
 
     def stop(self):
-        self.__isListening = False
+        self.__pipe_handler.stop()
         self.__db_handler.close()
+        self.__isListening = False
 
     def last_update(self): return self.__offset
 
@@ -65,6 +64,6 @@ class chat_handler:
         self._chat_id = chat_id
         pass
 
-    def handle(message: Message):
+    def handle(self, message: Message):
         pass
     pass

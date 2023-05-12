@@ -35,8 +35,7 @@ start_terminal(pipe_path)
 
 db=database.Database(os.environ["DB_PATH"] + "users.db")
 
-#dbhandler = database.DatabaseHandler(db, "users")
-dbhandler = "REPLACE_THIS_LINE"
+dbhandler = database.DatabaseHandler(db, "users")
 
 from pipe import pipe_handler
 pipehandler = pipe_handler(pipe_path)
