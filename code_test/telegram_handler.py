@@ -4,9 +4,8 @@ import os
 from subprocess import Popen, PIPE
 import time
 import dotenv, os, threading
-import win32pipe, win32file, pywintypes, time
 import database
-
+import pipe
 class bot_handler:
 
     __target: bot
@@ -15,16 +14,16 @@ class bot_handler:
 
     __offset: int = 0
 
-    __pipe_path: str = ""
+    __pipe_handler: pipe.pipe_handler
 
     __db_handler: database.DatabaseHandler = None
 
     __chat_handlers: dict = {}
 
-    def __init__(self, target: bot, pipe_path: str, db_handler: database.DatabaseHandler, offset: int = 0) -> None:
+    def __init__(self, target: bot, pipe_handler: pipe.pipe_handler = None, db_handler: database.DatabaseHandler = None, offset: int = 0) -> None:
         self.__target = target
         self.__offset = offset
-        self.__pipe_path = pipe_path
+        self.__pipe_handler = pipe_handler
         self.__db_handler = db_handler
         pass
 
@@ -58,31 +57,6 @@ class bot_handler:
         self.__db_handler.close()
 
     def last_update(self): return self.__offset
-
-    def __print_pipe(self, pipe, data):
-        data = bytes(str.encode(str(data)))
-        try:
-            win32file.WriteFile(pipe, data)
-        except:
-            self.__close_pipe(pipe)
-        pass
-
-    def __create_pipe(self):
-        pipe = win32pipe.CreateNamedPipe(
-        self.__pipe_path,
-        win32pipe.PIPE_ACCESS_DUPLEX,
-        win32pipe.PIPE_TYPE_MESSAGE | win32pipe.PIPE_READMODE_MESSAGE | win32pipe.PIPE_WAIT,
-        1, 65536, 65536,
-        0,
-        None)
-        print("waiting for client")
-        win32pipe.ConnectNamedPipe(pipe, None)
-        print("got client")
-        return pipe
-    
-    def __close_pipe(self, pipe):
-        win32file.CloseHandle(pipe)
-        pass
 
 class chat_handler:
     _chat_id: int

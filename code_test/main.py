@@ -38,7 +38,10 @@ db=database.Database(os.environ["DB_PATH"] + "users.db")
 #dbhandler = database.DatabaseHandler(db, "users")
 dbhandler = "REPLACE_THIS_LINE"
 
-bothandler = bot_handler(mybot, pipe_path, dbhandler, offset)
+from pipe import pipe_handler
+pipehandler = pipe_handler(pipe_path)
+
+bothandler = bot_handler(mybot, pipehandler, dbhandler, offset)
 
 threading.Thread(target=bothandler.listen).start()
 
