@@ -103,12 +103,12 @@ class Message:
     _date: int
     _location: Location
 
-    def __init__(self, message_id: int, _from: dict, chat: dict, text: str, date: int, location: dict = None, entities: list[dict] = []) -> None:
+    def __init__(self, message_id: int, _from: dict, chat: dict, date: int, text: str = None, location: dict = None, entities: list[dict] = None) -> None:
         self._message_id = message_id
         self._from = User(**_from)
         self._chat = Chat(**chat)
         self._text = text
-        self._entities = [Entity(**entity) for entity in entities]
+        self._entities = [Entity(**entity) for entity in entities] if entities else None
         self._date = date
         self._location = Location(**location) if location else None
         pass
@@ -157,15 +157,6 @@ class Bot:
     
     def getMe(self):
         return requests.get(f"{self.__link}/getMe")
-    
-    def getUpdates(self, offset):
-        offset = (0,offset)[offset>0]
-        updates = requests.get(f"{self.__link}/getUpdates?offset={offset + 1}").content.decode()
-        updates = json.loads(updates)
-        if(bool(updates["ok"])):
-            return updates["result"]
-        else:
-            return []
         
     def getUpdatesObject(self, offset) -> list[Update]:
         offset = (0,offset)[offset>0]

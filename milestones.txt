@@ -1,0 +1,4 @@
+Invia la posizione attuale
+Invia il distributore piu' vicino alla tua posizione
+Registrazione della macchina
+Invia il benzinaio piu' conveniente
