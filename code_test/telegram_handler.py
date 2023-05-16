@@ -41,11 +41,11 @@ class BotHandler:
         threading.Thread(target=self.__consume).start()
         try:
             while self.__isListening:
-                updates: Update = self.__target.getUpdatesObject(self.__offset)
+                updates: list[Update] = self.__target.getUpdatesObject(self.__offset)
                 for update in updates:
                     if update._update_id > self.__offset: self.__offset = update._update_id
                     #self.__pipe_handler.push_message(repr(update))
-                    self.__out(repr(update))
+                    self.__out(update._message._text)
                     self.__handle_update(update)
                     pass
         finally:
@@ -111,15 +111,28 @@ class ICommandHandler(ABC):
     def reset(self):
         pass
 
+    @abstractmethod
+    def set_next_chain(self):
+        pass
+
 class CommandHandler(ICommandHandler):
+    def __init__(self) -> None:
+        self._next_handler = None
+    
     _next_handler: ICommandHandler = None
     _command: str = ""
 
     def set_next(self, command: ICommandHandler) -> CommandHandler:
         self._next_handler = command
         return command
+    
+    def set_next_chain(self, command: list[ICommandHandler], n = 0) -> CommandHandler:
+        self._next_handler = None
+        if n < len(command):
+            self._next_handler = command[n]
+            self._next_handler.set_next_chain(command, n+1)
+        print(f"Settato {self._command}, iter: {n}")
 
-    @abstractmethod
     def handle(self, message: Message, command: str) -> Any:
         if self._next_handler:
             return self._next_handler.handle(message, command)
@@ -128,9 +141,10 @@ class CommandHandler(ICommandHandler):
 
     def get_commands(self, command: list[str] = []) -> list[str]:
         command.append(self._command)
+        print(f"{self}, {len(command)}")
         if self._next_handler:
             return self._next_handler.get_commands(command)
-        return command
+        return command  
     pass
 
     def get_last(self):
@@ -144,6 +158,9 @@ class CommandHandler(ICommandHandler):
         self._next_handler = None
 
 class CommandHandleStart(CommandHandler): #prima di ricevere /start ignora tutto
+    def __init__(self) -> None:
+        super().__init__()
+    
     _command = "/start"
     def handle(self, message: Message, command: str) -> Any:
         if self._command == command.lower():
@@ -153,6 +170,8 @@ class CommandHandleStart(CommandHandler): #prima di ricevere /start ignora tutto
             return super().handle(message, command)
         
 class CommandHandleRegisterVehicle(CommandHandler):
+    def __init__(self) -> None:
+        super().__init__()
     _command = "/register"
     def handle(self, message: Message, command: str) -> Any:
         if self._command == command.lower():
@@ -162,6 +181,8 @@ class CommandHandleRegisterVehicle(CommandHandler):
             return super().handle(message, command)
         
 class CommandHandleGetServiceStation(CommandHandler):
+    def __init__(self) -> None:
+        super().__init__()
     _command = "/find"
     def handle(self, message: Message, command: str) -> Any:
         if self._command == command.lower():
@@ -171,6 +192,8 @@ class CommandHandleGetServiceStation(CommandHandler):
             return super().handle(message, command)
         
 class CommandHandleGetPosition(CommandHandler):
+    def __init__(self) -> None:
+        super().__init__()
     _command = "/locate"
     def handle(self, message: Message, command: str) -> Any:
         if self._command == command.lower():
@@ -180,6 +203,8 @@ class CommandHandleGetPosition(CommandHandler):
             return super().handle(message, command)
         
 class CommandHandleGetLivePosition(CommandHandler):
+    def __init__(self) -> None:
+        super().__init__()
     _command = "/locate_live"
     def handle(self, message: Message, command: str) -> Any:
         if self._command == command.lower():
@@ -189,11 +214,11 @@ class CommandHandleGetLivePosition(CommandHandler):
             return super().handle(message, command)
         
 command_handlers = [
-    CommandHandleStart(),
-    CommandHandleGetServiceStation(),
-    CommandHandleRegisterVehicle(),
-    CommandHandleGetPosition(),
-    CommandHandleGetLivePosition()
+    CommandHandleStart,
+    CommandHandleGetServiceStation,
+    CommandHandleRegisterVehicle,
+    CommandHandleGetPosition,
+    CommandHandleGetLivePosition
 ]
 
 class MessageHandler():
@@ -228,14 +253,9 @@ class WaitCommandDecorator(BaseDecorator):
         #self.handler().handle(ans)
         if r:
             if r == WaitCommandDecorator:
-                commands = CommandHandleStart()
-                commands.reset()
-                print(commands.get_commands())
-                for h in command_handlers[1:]:
-                    c = h.__class__
-                    h = c()
-                    commands.get_last().set_next(h)
-                print(commands.get_commands())
+                commands = CommandHandler()
+                commands.set_next_chain([c() for c in command_handlers])
+                print(commands.get_commands([]))
                 return r(self.handler(), commands), ans
             else: return r(WaitGenericDataDecorator(self.handler)), ans
         else: return self, ans
@@ -266,8 +286,9 @@ class WaitCarDataDecorator(WaitGenericDataDecorator):
         if message._text:
             consume = message._text
             if self.is_float(consume):
-                commands = CommandHandleStart()
-                commands.set_next(CommandHandleGetServiceStation()).set_next(CommandHandleRegisterVehicle())
+                commands = CommandHandler()
+                commands.set_next_chain([c() for c in command_handlers])
+                print(commands.get_commands([]))
                 ret = WaitCommandDecorator(self.handler(), commands)
                 chatHandler._consume = float(consume)
                 ans = "The consume ratio was successfully updated"
@@ -283,8 +304,9 @@ class WaitLocationDataDecorator(WaitGenericDataDecorator):
         ret = self
         ans = "The data you submitted is not valid"
         if message._location:
-            commands = CommandHandleStart()
-            commands.set_next(CommandHandleGetServiceStation()).set_next(CommandHandleRegisterVehicle())
+            commands = CommandHandler()
+            commands.set_next_chain([c() for c in command_handlers])
+            print(commands.get_commands([]))
             ret = WaitCommandDecorator(self.handler(), commands)
             ans = "The location was successfully updated"
             chatHandler._location = message._location
