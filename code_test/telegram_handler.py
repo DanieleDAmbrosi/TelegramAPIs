@@ -70,6 +70,8 @@ class BotHandler:
 
 class ChatHandler():
     _chat_id: int
+    _consume: float = None # l/km
+    _location: Location = None ##
 
     def __init__(self, chat_id: int) -> None:
         self._chat_id = chat_id
@@ -78,7 +80,9 @@ class ChatHandler():
         pass
 
     def handle(self, message: Message):
-        self._handler, ans = self._handler.handle(message)
+        self._handler, ans = self._handler.handle(message, self)
+        print(type(self._handler))
+        #self._handler._cor.get_commands([])
         return ans
 
     pass
@@ -95,8 +99,21 @@ class ICommandHandler(ABC):
     def handle(self, request):
         pass
 
+    @abstractmethod
+    def get_commands(self, command):
+        pass
+
+    @abstractmethod
+    def get_last(self):
+        pass
+
+    @abstractmethod
+    def reset(self):
+        pass
+
 class CommandHandler(ICommandHandler):
     _next_handler: ICommandHandler = None
+    _command: str = ""
 
     def set_next(self, command: ICommandHandler) -> CommandHandler:
         self._next_handler = command
@@ -109,29 +126,75 @@ class CommandHandler(ICommandHandler):
         return None, "Command not found" #-> next_handler, risposta
     pass
 
+    def get_commands(self, command: list[str] = []) -> list[str]:
+        command.append(self._command)
+        if self._next_handler:
+            return self._next_handler.get_commands(command)
+        return command
+    pass
+
+    def get_last(self):
+        if self._next_handler:
+            return self._next_handler.get_last()
+        return self
+    
+    def reset(self):
+        if self._next_handler:
+            self._next_handler.reset()
+        self._next_handler = None
+
 class CommandHandleStart(CommandHandler): #prima di ricevere /start ignora tutto
+    _command = "/start"
     def handle(self, message: Message, command: str) -> Any:
-        if "/start" == command.lower():
+        if self._command == command.lower():
             #return WaitName, f"[CommandName] What's your name?"
             return WaitCommandDecorator, "Harry Botter greats you"
         else:
             return super().handle(message, command)
         
 class CommandHandleRegisterVehicle(CommandHandler):
+    _command = "/register"
     def handle(self, message: Message, command: str) -> Any:
-        if "/register" == command.lower():
+        if self._command == command.lower():
             #return WaitName, f"[CommandName] What's your name?"
-            return WaitCarDataDecorator, "Please insert your car datas..."
+            return WaitCarDataDecorator, "Please insert your car consume [l/km]"
         else:
             return super().handle(message, command)
         
 class CommandHandleGetServiceStation(CommandHandler):
+    _command = "/find"
     def handle(self, message: Message, command: str) -> Any:
-        if "/locate" == command.lower():
+        if self._command == command.lower():
             #return WaitName, f"[CommandName] What's your name?"
-            return WaitLocationDataDecorator, "Please share your position with me..."
+            return WaitLocationDataDecorator, "TO DO"
         else:
             return super().handle(message, command)
+        
+class CommandHandleGetPosition(CommandHandler):
+    _command = "/locate"
+    def handle(self, message: Message, command: str) -> Any:
+        if self._command == command.lower():
+            #return WaitName, f"[CommandName] What's your name?"
+            return WaitLocationDataDecorator, "Please share your position with me"
+        else:
+            return super().handle(message, command)
+        
+class CommandHandleGetLivePosition(CommandHandler):
+    _command = "/locate_live"
+    def handle(self, message: Message, command: str) -> Any:
+        if self._command == command.lower():
+            #return WaitName, f"[CommandName] What's your name?"
+            return WaitLocationDataDecorator, "Please share your live position with me"
+        else:
+            return super().handle(message, command)
+        
+command_handlers = [
+    CommandHandleStart(),
+    CommandHandleGetServiceStation(),
+    CommandHandleRegisterVehicle(),
+    CommandHandleGetPosition(),
+    CommandHandleGetLivePosition()
+]
 
 class MessageHandler():
     def handle(message):
@@ -157,16 +220,22 @@ class WaitCommandDecorator(BaseDecorator):
         self._cor = cor
         super().__init__(handler)
 
-    def handle(self, message: Message) -> BaseDecorator:
+    def handle(self, message: Message, chatHandler: ChatHandler) -> BaseDecorator:
         if not message._entities: return self, "Aspettato: comando"#non ci sono comandi
         e = message._entities[0]
         command = message._text[e._offset:e._offset+e._length]
         r, ans = self._cor.handle(message, command)
-        commands = CommandHandleStart()
-        commands.set_next(CommandHandleGetServiceStation()).set_next(CommandHandleRegisterVehicle())
         #self.handler().handle(ans)
         if r:
             if r == WaitCommandDecorator:
+                commands = CommandHandleStart()
+                commands.reset()
+                print(commands.get_commands())
+                for h in command_handlers[1:]:
+                    c = h.__class__
+                    h = c()
+                    commands.get_last().set_next(h)
+                print(commands.get_commands())
                 return r(self.handler(), commands), ans
             else: return r(WaitGenericDataDecorator(self.handler)), ans
         else: return self, ans
@@ -191,7 +260,7 @@ class WaitCarDataDecorator(WaitGenericDataDecorator):
     def __init__(self, handler: WaitGenericDataDecorator) -> None:
         super().__init__(handler)
 
-    def handle(self, message: Message) -> WaitGenericDataDecorator:
+    def handle(self, message: Message, chatHandler: ChatHandler) -> WaitGenericDataDecorator:
         ret = self
         ans = "The data you submitted is not valid"
         if message._text:
@@ -200,6 +269,7 @@ class WaitCarDataDecorator(WaitGenericDataDecorator):
                 commands = CommandHandleStart()
                 commands.set_next(CommandHandleGetServiceStation()).set_next(CommandHandleRegisterVehicle())
                 ret = WaitCommandDecorator(self.handler(), commands)
+                chatHandler._consume = float(consume)
                 ans = "The consume ratio was successfully updated"
         else: self.handler().handle(None)
         return ret, ans
@@ -209,7 +279,7 @@ class WaitLocationDataDecorator(WaitGenericDataDecorator):
     def __init__(self, handler: WaitGenericDataDecorator) -> None:
         super().__init__(handler)
 
-    def handle(self, message: Message) -> WaitGenericDataDecorator:
+    def handle(self, message: Message, chatHandler: ChatHandler) -> WaitGenericDataDecorator:
         ret = self
         ans = "The data you submitted is not valid"
         if message._location:
@@ -217,5 +287,6 @@ class WaitLocationDataDecorator(WaitGenericDataDecorator):
             commands.set_next(CommandHandleGetServiceStation()).set_next(CommandHandleRegisterVehicle())
             ret = WaitCommandDecorator(self.handler(), commands)
             ans = "The location was successfully updated"
+            chatHandler._location = message._location
         else: self.handler().handle(None)
         return ret, ans
