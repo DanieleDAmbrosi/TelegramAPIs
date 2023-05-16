@@ -33,7 +33,8 @@ class DatabaseHandler():
     _model: dict = {}
 
     def __init__(self, db: Database, tables: arr):
-        self.connect(db, tables)
+        self._db = db
+        #self.connect(db, tables)
         pass
 
     def connect(self, db: Database, tables: arr):
@@ -103,6 +104,15 @@ class DatabaseHandler():
         conn.commit()
         curs.close()
         pass
+
+    def exec(self, query: str):
+        conn = self._db.connect()
+        curs = conn.cursor()
+        curs.execute(query)
+        result = curs.fetchall()
+        conn.commit()
+        curs.close()
+        return result
 
     def getmodel(self) -> dict:
         return self._model

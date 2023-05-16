@@ -21,7 +21,7 @@ class BotHandler:
     __consume = lambda: None
     __stop_consume = lambda: None
 
-    __chat_handlers: dict = {}
+    __chat_handlers: dict[int, ChatHandler] = {}
 
     def __init__(
         self,
@@ -67,7 +67,7 @@ class BotHandler:
     def __handle_update(self, update: Update):
         message: Message = update._message
         chat: Chat = message._chat
-        if chat._id not in self.__chat_handlers:
+        if chat._id not in self.__chat_handlers.keys():
             self.__chat_handlers[chat._id] = ChatHandler(chat._id, self, 30)
         self.__chat_handlers[chat._id].handle(message)
         pass
@@ -76,6 +76,8 @@ class BotHandler:
         self.__stop_consume()
         self.__db_handler.close()
         self.__isListening = False
+        for chat in self.__chat_handlers.copy().values():
+            chat.stop()
 
     def last_update(self):
         return self.__offset
@@ -96,16 +98,8 @@ class BotHandler:
     def setCommands(self, commands):
         self.__target.setCommands(commands)
 
-
-from threading import Timer
-
-
-class RepeatingTimer(Timer):
-    def run(self):
-        while not self.finished.is_set():
-            self.function(*self.args, **self.kwargs)
-            self.finished.wait(self.interval)
-
+    def get_db(self):
+        return self.__db_handler
 
 class ChatHandler:
     _chat_id: int
@@ -152,7 +146,6 @@ class ChatHandler:
         self._last_update = message._date
         try:
             commands = []
-            print(self._handler._cor.get_commands([]))
             for c in self._handler._cor.get_commands([]):
                 if c != "":
                     commands.append({"command": str(c), "description": str(c).replace("/", "")})
@@ -166,9 +159,12 @@ class ChatHandler:
             pass
 
     def afk(self, last_update: float):
-        time.sleep(self.AFK_RESET + self.AFK_RESET * 0.10)
+        time.sleep(self.AFK_RESET + self.AFK_RESET * 0.10 - 15)
+        if not self._running: return
+        self.sendMessage("You will be disconnected in 15 seconds")
+        time.sleep(15)
         current_time = time.time()
-        if current_time - last_update >= self.AFK_RESET + self.AFK_RESET * 0.10:
+        if current_time - self._last_update < self.AFK_RESET + self.AFK_RESET * 0.10 and self._running:
             threading.Thread(target=self.afk, args=[self._last_update]).start()
         else:
             self.stop()
@@ -181,6 +177,22 @@ class ChatHandler:
 
     def notify(self):
         self._telegram.update(self)
+        pass
+
+    def get_impianti(self):
+        if not self._location or not self._consume: return None
+        db=database.Database("./data/data.db")
+        lat = self._location._latitude
+        lon = self._location._longitude
+        rad = 50
+        dbh = self._telegram.get_db()
+        dbh.connect(db, ["impianti","prezzi"])
+        return dbh.exec(f"""SELECT *
+FROM impianti join prezzi on impianti.idImpianto = prezzi.idImpianto
+WHERE descCarburante LIKE '%'
+    AND (acos(sin({lat})*sin( Latitudine )+cos({lat})*cos( Latitudine )*cos( Longitudine - {lon}))*6371) < {rad}
+GROUP BY impianti.idImpianto
+ORDER BY (acos(sin({lat})*sin( Latitudine )+cos({lat})*cos( Latitudine )*cos( Longitudine - {lon}))*6371) ASC""")
         pass
 
     pass
@@ -326,8 +338,12 @@ class CommandHandleGetServiceStation(CommandHandler):
     def handle(self, message: Message, command: str, chat: ChatHandler) -> Any:
         if self._command == command.lower():
             # return WaitName, f"[CommandName] What's your name?"
-            chat.sendMessage("TO-DO")
-            return WaitLocationDataDecorator
+            res = chat.get_impianti()
+            if not res: chat.sendMessage("Not all parameters are setted")
+            elif len(res) == 0: chat.sendMessage("No results")
+            else:
+                chat.sendMessage(res[:5])
+            return WaitCommandDecorator
         else:
             return super().handle(message, command, chat)
 

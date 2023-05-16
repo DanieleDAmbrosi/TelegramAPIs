@@ -33,9 +33,9 @@ print(mybot.getMe().content)
 pipe_path = os.environ["PIPE_PATH"]
 start_terminal(pipe_path)
 
-db=database.Database(os.environ["DB_PATH"] + "users.db")
+db=database.Database(os.environ["DB_PATH"] + "data.db")
 
-dbhandler = database.DatabaseHandler(db, "users")
+dbhandler = database.DatabaseHandler(db, ["prezzi", "impianti"])
 
 from pipe import PipeHandler
 pipehandler = None

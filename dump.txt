@@ -1,0 +1,5 @@
+SELECT *
+FROM impianti join prezzi on impianti.idImpianto = prezzi.idImpianto
+WHERE descCarburante LIKE '%"+ tipoCarburante[0] +"%'
+    AND (acos(sin("+str(latitude)+")*sin( Latitudine )+cos("+str(latitude)+")*cos( Latitudine )*cos( Longitudine - "+str(longitude)+"))*6371) < " + str(raggioKM) +"
+ORDER BY prezzo,(acos(sin("+str(latitude)+")*sin( Latitudine )+cos("+str(latitude)+")*cos( Latitudine )*cos( Longitudine - "+str(longitude)+"))*6371) ASC

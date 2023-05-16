@@ -168,7 +168,6 @@ class Bot:
             return []
     
     def setCommands(self, commands):
-        print(requests.post(f"{self.__link}/setMyCommands", json=commands).text)
         return requests.post(f"{self.__link}/setMyCommands", json=commands)
 
     def getCommands(self, scope = {"type": "default"}, language_code = ""):
