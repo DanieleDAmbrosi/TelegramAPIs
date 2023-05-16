@@ -5,8 +5,10 @@ from typing import Any
 import threading
 import database
 import pipe
-class BotHandler:
+import time
 
+
+class BotHandler:
     __target: Bot
 
     __isListening: bool = False
@@ -21,15 +23,23 @@ class BotHandler:
 
     __chat_handlers: dict = {}
 
-    def __init__(self, target: Bot, pipe_handler: pipe.PipeHandler = None, db_handler: database.DatabaseHandler = None, offset: int = 0) -> None:
+    def __init__(
+        self,
+        target: Bot,
+        pipe_handler: pipe.PipeHandler = None,
+        db_handler: database.DatabaseHandler = None,
+        offset: int = 0,
+    ) -> None:
         self.__target = target
         self.__offset = offset
 
         if pipe_handler:
             self.__out = pipe_handler.push_message
             self.__consume = pipe_handler.consume
-            self.__stop_consume = pipe_handler.stop #se il pipe handler non esiste scelgo come canale di out la print normale
-            
+            self.__stop_consume = (
+                pipe_handler.stop
+            )  # se il pipe handler non esiste scelgo come canale di out la print normale
+
         # self.__pipe_handler.stop = lambda : None
         # self.__pipe_handler.consume = lambda : None
         self.__db_handler = db_handler
@@ -37,28 +47,29 @@ class BotHandler:
 
     def listen(self):
         self.__isListening = True
-        #threading.Thread(target=self.__pipe_handler.consume).start()
+        # threading.Thread(target=self.__pipe_handler.consume).start()
         threading.Thread(target=self.__consume).start()
         try:
             while self.__isListening:
                 updates: list[Update] = self.__target.getUpdatesObject(self.__offset)
                 for update in updates:
-                    if update._update_id > self.__offset: self.__offset = update._update_id
-                    #self.__pipe_handler.push_message(repr(update))
+                    if update._update_id > self.__offset:
+                        self.__offset = update._update_id
+                    # self.__pipe_handler.push_message(repr(update))
                     self.__out(update._message._text)
                     self.__handle_update(update)
                     pass
         finally:
-            if self.__isListening: self.stop()
+            if self.__isListening:
+                self.stop()
         pass
 
     def __handle_update(self, update: Update):
         message: Message = update._message
         chat: Chat = message._chat
         if chat._id not in self.__chat_handlers:
-            self.__chat_handlers[chat._id] = ChatHandler(chat._id)
-        ans = self.__chat_handlers[chat._id].handle(message)
-        self.__target.sendMessage(chat._id, ans)
+            self.__chat_handlers[chat._id] = ChatHandler(chat._id, self, 30)
+        self.__chat_handlers[chat._id].handle(message)
         pass
 
     def stop(self):
@@ -66,29 +77,126 @@ class BotHandler:
         self.__db_handler.close()
         self.__isListening = False
 
-    def last_update(self): return self.__offset
+    def last_update(self):
+        return self.__offset
 
-class ChatHandler():
+    def update(self, chat: ChatHandler):
+        if chat._chat_id in self.__chat_handlers.keys():
+            if not chat._running:
+                self.__target.sendMessage(chat._chat_id, "You have been disconnected")
+                self.__chat_handlers.pop(chat._chat_id)
+        pass
+
+    def sendMessage(self, chat_id: int, text: str):
+        self.__target.sendMessage(chat_id, text)
+
+    def sendLocation(self, chat_id: int, latitude: float, longitude: float):
+        self.__target.sendLocation(chat_id, latitude, longitude)
+
+    def setCommands(self, commands):
+        self.__target.setCommands(commands)
+
+
+from threading import Timer
+
+
+class RepeatingTimer(Timer):
+    def run(self):
+        while not self.finished.is_set():
+            self.function(*self.args, **self.kwargs)
+            self.finished.wait(self.interval)
+
+
+class ChatHandler:
     _chat_id: int
-    _consume: float = None # l/km
-    _location: Location = None ##
+    _consume: float = None  # l/km
+    _location: Location = None  ##
+    _telegram: BotHandler = None
+    _running: bool = False
+    _last_update: float = 0.0
+    AFK_RESET: float = 5 * 60
+    STARTING_COMMANDS: dict = {}
 
-    def __init__(self, chat_id: int) -> None:
+    def __init__(
+        self, chat_id: int, telegram: BotHandler, AFK_RESET: int = 300
+    ) -> None:
         self._chat_id = chat_id
         cor = CommandHandleStart()
         self._handler = WaitCommandDecorator(BaseDecorator(MessageHandler()), cor)
+        self._telegram = telegram
+        self._running = True
+        self._last_update = time.time()
+        self.AFK_RESET = AFK_RESET
+        threading.Thread(target=self.afk, args=[self._last_update]).start()
+        self.STARTING_COMMANDS = {
+            "commands": [
+                {
+                    "command": "start",
+                    "description": "Start the bot",
+                },
+                {
+                    "command": "explain",
+                    "description": "Describes the bot",
+                },
+            ],
+            "scope": {"type": "chat", "chat_id": self._chat_id},
+            "language_code": "",
+        }
+        self._telegram.setCommands(self.STARTING_COMMANDS)
         pass
 
     def handle(self, message: Message):
-        self._handler, ans = self._handler.handle(message, self)
-        print(type(self._handler))
-        #self._handler._cor.get_commands([])
-        return ans
+        self._handler = self._handler.handle(message, self)
+        if not self._handler:
+            self.stop()
+        self._last_update = message._date
+        try:
+            commands = []
+            print(self._handler._cor.get_commands([]))
+            for c in self._handler._cor.get_commands([]):
+                if c != "":
+                    commands.append({"command": str(c), "description": str(c).replace("/", "")})
+            comms = {
+                "commands": commands,
+                "scope": {"type": "chat", "chat_id": self._chat_id},
+                "language_code": "",
+            }
+            self._telegram.setCommands(comms)
+        except AttributeError:
+            pass
+
+    def afk(self, last_update: float):
+        time.sleep(self.AFK_RESET + self.AFK_RESET * 0.10)
+        current_time = time.time()
+        if current_time - last_update >= self.AFK_RESET + self.AFK_RESET * 0.10:
+            threading.Thread(target=self.afk, args=[self._last_update]).start()
+        else:
+            self.stop()
+
+    def stop(self):
+        self._running = False
+        self._telegram.setCommands(self.STARTING_COMMANDS)
+        self.notify()
+        pass
+
+    def notify(self):
+        self._telegram.update(self)
+        pass
 
     pass
 
+    def sendMessage(self, text: str):
+        self._telegram.sendMessage(self._chat_id, text)
+
+    def sendLocation(self, latitude: float, longitude: float):
+        self._telegram.sendLocation(self._chat_id, latitude, longitude)
+
+    def setCommands(self, commands):
+        self._telegram.setCommands(commands)
+
 
 from abc import ABC, abstractmethod
+
 
 class ICommandHandler(ABC):
     @abstractmethod
@@ -115,150 +223,193 @@ class ICommandHandler(ABC):
     def set_next_chain(self):
         pass
 
+
 class CommandHandler(ICommandHandler):
     def __init__(self) -> None:
         self._next_handler = None
-    
+
     _next_handler: ICommandHandler = None
     _command: str = ""
 
     def set_next(self, command: ICommandHandler) -> CommandHandler:
         self._next_handler = command
         return command
-    
-    def set_next_chain(self, command: list[ICommandHandler], n = 0) -> CommandHandler:
+
+    def set_next_chain(self, command: list[ICommandHandler], n=0) -> CommandHandler:
         self._next_handler = None
         if n < len(command):
             self._next_handler = command[n]
-            self._next_handler.set_next_chain(command, n+1)
-        print(f"Settato {self._command}, iter: {n}")
+            self._next_handler.set_next_chain(command, n + 1)
+        # print(f"Settato {self._command}, iter: {n}")
 
-    def handle(self, message: Message, command: str) -> Any:
+    def handle(self, message: Message, command: str, chat: ChatHandler) -> Any:
         if self._next_handler:
-            return self._next_handler.handle(message, command)
-        return None, "Command not found" #-> next_handler, risposta
+            return self._next_handler.handle(message, command, chat)
+        chat.sendMessage("WTF are you saying m' dude")
+        return None  # -> next_handler, risposta
+
     pass
 
     def get_commands(self, command: list[str] = []) -> list[str]:
         command.append(self._command)
-        print(f"{self}, {len(command)}")
+        # print(f"{self}, {len(command)}")
         if self._next_handler:
             return self._next_handler.get_commands(command)
-        return command  
+        return command
+
     pass
 
     def get_last(self):
         if self._next_handler:
             return self._next_handler.get_last()
         return self
-    
+
     def reset(self):
         if self._next_handler:
             self._next_handler.reset()
         self._next_handler = None
 
-class CommandHandleStart(CommandHandler): #prima di ricevere /start ignora tutto
+
+class CommandHandleStart(CommandHandler):  # prima di ricevere /start ignora tutto
     def __init__(self) -> None:
         super().__init__()
-    
+
     _command = "/start"
-    def handle(self, message: Message, command: str) -> Any:
+
+    def handle(self, message: Message, command: str, chat: ChatHandler) -> Any:
         if self._command == command.lower():
-            #return WaitName, f"[CommandName] What's your name?"
-            return WaitCommandDecorator, "Harry Botter greats you"
+            # return WaitName, f"[CommandName] What's your name?"
+            chat.sendMessage("Hey guys we have a gift for you...")
+            chat.sendMessage("WAIT, This is not how it looks")
+            chat.sendMessage("Welcome to the chamber of secrets")
+            return WaitCommandDecorator
         else:
-            return super().handle(message, command)
-        
+            return super().handle(message, command, chat)
+
+
+class CommandHandleStop(CommandHandler):  # prima di ricevere /start ignora tutto
+    def __init__(self) -> None:
+        super().__init__()
+
+    _command = "/stop"
+
+    def handle(self, message: Message, command: str, chat: ChatHandler) -> Any:
+        if self._command == command.lower():
+            chat.sendMessage("Goodbye my dearest friend")
+            chat.stop()
+            return None
+        else:
+            return super().handle(message, command, chat)
+
+
 class CommandHandleRegisterVehicle(CommandHandler):
     def __init__(self) -> None:
         super().__init__()
+
     _command = "/register"
-    def handle(self, message: Message, command: str) -> Any:
+
+    def handle(self, message: Message, command: str, chat: ChatHandler) -> Any:
         if self._command == command.lower():
-            #return WaitName, f"[CommandName] What's your name?"
-            return WaitCarDataDecorator, "Please insert your car consume [l/km]"
+            # return WaitName, f"[CommandName] What's your name?"
+            chat.sendMessage("How much does it take for you broom to fly? [l/km]")
+            return WaitCarDataDecorator
         else:
-            return super().handle(message, command)
-        
+            return super().handle(message, command, chat)
+
+
 class CommandHandleGetServiceStation(CommandHandler):
     def __init__(self) -> None:
         super().__init__()
+
     _command = "/find"
-    def handle(self, message: Message, command: str) -> Any:
+
+    def handle(self, message: Message, command: str, chat: ChatHandler) -> Any:
         if self._command == command.lower():
-            #return WaitName, f"[CommandName] What's your name?"
-            return WaitLocationDataDecorator, "TO DO"
+            # return WaitName, f"[CommandName] What's your name?"
+            chat.sendMessage("TO-DO")
+            return WaitLocationDataDecorator
         else:
-            return super().handle(message, command)
-        
+            return super().handle(message, command, chat)
+
+
 class CommandHandleGetPosition(CommandHandler):
     def __init__(self) -> None:
         super().__init__()
+
     _command = "/locate"
-    def handle(self, message: Message, command: str) -> Any:
+
+    def handle(self, message: Message, command: str, chat: ChatHandler) -> Any:
         if self._command == command.lower():
-            #return WaitName, f"[CommandName] What's your name?"
-            return WaitLocationDataDecorator, "Please share your position with me"
+            # return WaitName, f"[CommandName] What's your name?"
+            chat.sendMessage("Send me you position baby girl, don't be shy :PPP")
+            return WaitLocationDataDecorator
         else:
-            return super().handle(message, command)
-        
-class CommandHandleGetLivePosition(CommandHandler):
-    def __init__(self) -> None:
-        super().__init__()
-    _command = "/locate_live"
-    def handle(self, message: Message, command: str) -> Any:
-        if self._command == command.lower():
-            #return WaitName, f"[CommandName] What's your name?"
-            return WaitLocationDataDecorator, "Please share your live position with me"
-        else:
-            return super().handle(message, command)
-        
+            return super().handle(message, command, chat)
+
+
+# class CommandHandleGetLivePosition(CommandHandler):
+#     def __init__(self) -> None:
+#         super().__init__()
+#     _command = "/locate_live"
+#     def handle(self, message: Message, command: str) -> Any:
+#         if self._command == command.lower():
+#             #return WaitName, f"[CommandName] What's your name?"
+#             return WaitLocationDataDecorator, "Please share your live position with me"
+#         else:
+#             return super().handle(message, command)
+
 command_handlers = [
-    CommandHandleStart,
     CommandHandleGetServiceStation,
     CommandHandleRegisterVehicle,
     CommandHandleGetPosition,
-    CommandHandleGetLivePosition
+    # CommandHandleGetLivePosition,
+    CommandHandleStop,
 ]
 
-class MessageHandler():
+
+class MessageHandler:
     def handle(message):
         return message
 
-class BaseDecorator():
+
+class BaseDecorator:
     def __init__(self, handler: MessageHandler) -> None:
         self._handler = handler
         pass
 
     def handler(self):
         return self._handler
-    
+
     def handle(self, message):
         return self.handler().handle(message)
-    
+
     pass
+
 
 class WaitCommandDecorator(BaseDecorator):
     _cor: CommandHandler
 
-    def __init__(self, handler: BaseDecorator, cor: CommandHandler) -> None:
-        self._cor = cor
+    def __init__(self, handler: BaseDecorator, cor: CommandHandler = None) -> None:
+        commands = CommandHandler()
+        commands.set_next_chain([c() for c in command_handlers])
+        self._cor = cor if cor else commands
         super().__init__(handler)
 
-    def handle(self, message: Message, chatHandler: ChatHandler) -> BaseDecorator:
-        if not message._entities: return self, "Aspettato: comando"#non ci sono comandi
+    def handle(self, message: Message, chat: ChatHandler) -> BaseDecorator:
+        if not message._entities:
+            chat.sendMessage(f"Command expected")
+            return self  # non ci sono comandi
         e = message._entities[0]
-        command = message._text[e._offset:e._offset+e._length]
-        r, ans = self._cor.handle(message, command)
-        #self.handler().handle(ans)
-        if r:
-            if r == WaitCommandDecorator:
-                commands = CommandHandler()
-                commands.set_next_chain([c() for c in command_handlers])
-                print(commands.get_commands([]))
-                return r(self.handler(), commands), ans
-            else: return r(WaitGenericDataDecorator(self.handler)), ans
-        else: return self, ans
+        command = message._text[e._offset : e._offset + e._length]
+        r = self._cor.handle(message, command, chat)
+        # self.handler().handle(ans)
+
+        if not r:
+            return self
+        elif r != WaitCommandDecorator:
+            return r(WaitGenericDataDecorator(self.handler()))
+        return r(self.handler())
+
 
 class WaitGenericDataDecorator(BaseDecorator):
     def __init__(self, handler: BaseDecorator) -> None:
@@ -267,8 +418,9 @@ class WaitGenericDataDecorator(BaseDecorator):
     def handle(self, data: str) -> BaseDecorator:
         if data:
             self.handler().handle(data)
-        return self.handler() #self.handler() = base decorator
-    
+        return self.handler()  # self.handler() = base decorator
+
+
 class WaitCarDataDecorator(WaitGenericDataDecorator):
     def is_float(self, string):
         try:
@@ -280,35 +432,32 @@ class WaitCarDataDecorator(WaitGenericDataDecorator):
     def __init__(self, handler: WaitGenericDataDecorator) -> None:
         super().__init__(handler)
 
-    def handle(self, message: Message, chatHandler: ChatHandler) -> WaitGenericDataDecorator:
+    def handle(self, message: Message, chat: ChatHandler) -> WaitGenericDataDecorator:
         ret = self
         ans = "The data you submitted is not valid"
         if message._text:
             consume = message._text
             if self.is_float(consume):
-                commands = CommandHandler()
-                commands.set_next_chain([c() for c in command_handlers])
-                print(commands.get_commands([]))
-                ret = WaitCommandDecorator(self.handler(), commands)
-                chatHandler._consume = float(consume)
+                ret = WaitCommandDecorator(self.handler())
+                chat._consume = float(consume)
                 ans = "The consume ratio was successfully updated"
-        else: self.handler().handle(None)
-        return ret, ans
+        else:
+            self.handler().handle(None)
+        chat.sendMessage(ans)
+        return ret
 
-    
+
 class WaitLocationDataDecorator(WaitGenericDataDecorator):
     def __init__(self, handler: WaitGenericDataDecorator) -> None:
         super().__init__(handler)
 
-    def handle(self, message: Message, chatHandler: ChatHandler) -> WaitGenericDataDecorator:
-        ret = self
-        ans = "The data you submitted is not valid"
+    def handle(self, message: Message, chat: ChatHandler) -> WaitGenericDataDecorator:
+        ret = WaitCommandDecorator(self.handler())
+        ans = "Fucking whore"
         if message._location:
-            commands = CommandHandler()
-            commands.set_next_chain([c() for c in command_handlers])
-            print(commands.get_commands([]))
-            ret = WaitCommandDecorator(self.handler(), commands)
-            ans = "The location was successfully updated"
-            chatHandler._location = message._location
-        else: self.handler().handle(None)
-        return ret, ans
+            ans = "Very good baby, very good"
+            chat.sendMessage(ans)
+            chat._location = message._location
+        else:
+            self.handler().handle(None)
+        return ret

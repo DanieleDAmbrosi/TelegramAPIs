@@ -168,6 +168,7 @@ class Bot:
             return []
     
     def setCommands(self, commands):
+        print(requests.post(f"{self.__link}/setMyCommands", json=commands).text)
         return requests.post(f"{self.__link}/setMyCommands", json=commands)
 
     def getCommands(self, scope = {"type": "default"}, language_code = ""):
@@ -175,3 +176,6 @@ class Bot:
     
     def sendMessage(self, chat_id, text):
         return requests.post(f"{self.__link}/sendMessage", json={"chat_id": chat_id, "text": text})
+    
+    def sendLocation(self, chat_id, latitude, longitude):
+        return requests.post(f"{self.__link}/sendLocation", json={"chat_id": chat_id, "latitude": latitude, "longitude": longitude})
