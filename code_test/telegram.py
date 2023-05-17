@@ -47,7 +47,7 @@ class User:
     _username: str = ""
     _language_code: str = ""
 
-    def __init__(self, id, is_bot, first_name, last_name, username, language_code) -> None:
+    def __init__(self, id, is_bot, username, language_code, first_name: str = "", last_name: str = "") -> None:
         self._id = id
         self._is_bot = is_bot
         self._first_name = first_name
@@ -75,7 +75,7 @@ class Chat:
     _username: str = ""
     _type: str = ""
 
-    def __init__(self, id, first_name, last_name, username, type):
+    def __init__(self, id, username, type, first_name:str = "", last_name:str = ""):
         self._id = id
         self._first_name = first_name
         self._last_name = last_name

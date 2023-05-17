@@ -107,6 +107,7 @@ class DatabaseHandler():
 
     def exec(self, query: str):
         conn = self._db.connect()
+        conn.row_factory = sqlite3.Row
         curs = conn.cursor()
         curs.execute(query)
         result = curs.fetchall()

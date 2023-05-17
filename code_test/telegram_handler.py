@@ -187,13 +187,12 @@ class ChatHandler:
         rad = 50
         dbh = self._telegram.get_db()
         dbh.connect(db, ["impianti","prezzi"])
-        return dbh.exec(f"""SELECT *
+        res = dbh.exec(f"""SELECT *
 FROM impianti join prezzi on impianti.idImpianto = prezzi.idImpianto
 WHERE descCarburante LIKE '%'
     AND (acos(sin({lat})*sin( Latitudine )+cos({lat})*cos( Latitudine )*cos( Longitudine - {lon}))*6371) < {rad}
-GROUP BY impianti.idImpianto
 ORDER BY (acos(sin({lat})*sin( Latitudine )+cos({lat})*cos( Latitudine )*cos( Longitudine - {lon}))*6371) ASC""")
-        pass
+        return res
 
     pass
 
@@ -335,6 +334,18 @@ class CommandHandleGetServiceStation(CommandHandler):
 
     _command = "/find"
 
+    class Impianto:
+        prezzi: dict[str, float] = {}
+        lat: float
+        lon: float
+        nome: str
+        bandiera: str
+
+        def __str__(self) -> str:
+            for key, value in self.prezzi.items():
+                str_prezzi += f"prezzo {key}: {str(value)}\n\r" 
+            return f"Impianto: {self.nome}\n\rBandiera: {self.bandiera}\n\r{str_prezzi}"
+
     def handle(self, message: Message, command: str, chat: ChatHandler) -> Any:
         if self._command == command.lower():
             # return WaitName, f"[CommandName] What's your name?"
@@ -342,7 +353,20 @@ class CommandHandleGetServiceStation(CommandHandler):
             if not res: chat.sendMessage("Not all parameters are setted")
             elif len(res) == 0: chat.sendMessage("No results")
             else:
-                chat.sendMessage(res[:5])
+                impianti: dict[int, self.Impianto] = {}
+                for r in res:
+                    id = r["idImpianto"]
+                    if id not in impianti.keys():
+                        impianti[id] = self.Impianto()
+                        impianti[id].lat = float(r["Latitudine"])
+                        impianti[id].lon = float(r["Longitudine"])
+                        impianti[id].nome = r["Nome"]
+                        impianti[id].bandiera = r["Bandiera"]
+                    impianti[id].prezzi[r["descCarburante"]] = float(r["prezzo"])
+                for imp in list(impianti.values())[:2]:
+                    chat.sendLocation(imp.lat, imp.lon)
+                    chat.sendMessage(str(imp))
+
             return WaitCommandDecorator
         else:
             return super().handle(message, command, chat)
