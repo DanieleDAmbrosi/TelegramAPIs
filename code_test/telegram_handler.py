@@ -342,6 +342,7 @@ class CommandHandleGetServiceStation(CommandHandler):
         bandiera: str
 
         def __str__(self) -> str:
+            str_prezzi = ""
             for key, value in self.prezzi.items():
                 str_prezzi += f"prezzo {key}: {str(value)}\n\r" 
             return f"Impianto: {self.nome}\n\rBandiera: {self.bandiera}\n\r{str_prezzi}"
